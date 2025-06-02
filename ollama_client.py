@@ -8,50 +8,37 @@ try:
     print(f"--- Attempting to connect to Ollama server at: {ollama_api_url} ---")
     client = ollama.Client(host=ollama_api_url)
 
-    # --- Step 1: Verify model availability ---
-    print("\n--- Listing available models on the Ollama server ---")
-    models_list = client.list() # Fetches a list of models currently available on the server
+    # --- Debugging (can be removed after verifying fix) ---
+    # print("\n--- Listing available models (for debug) ---")
+    # models_response = client.list()
+    # print(f"Raw models_response from Ollama: {models_response}")
+    #
+    # # New way to access models from the updated Ollama client response
+    # if hasattr(models_response, 'models') and isinstance(models_response.models, list):
+    #     print("Models found (via new structure):")
+    #     for model_info in models_response.models:
+    #         # Access attributes directly, e.g., model_info.name
+    #         print(f"- {model_info.model}") # Use .model for the full name like 'llama3:latest'
+    # else:
+    #     print("WARNING: Could not interpret models list from client.list() response.")
+    # --- End Debugging ---
 
-    # --- IMPORTANT DEBUG STEP ---
-    print(f"Raw models_list response from Ollama: {models_list}")
-    # --- END DEBUG STEP ---
+    # --- Direct Prompt Test ---
+    print("\n--- Running a direct prompt test with llama3 ---")
+    test_prompt = "What is the capital of Canada?"
+    print(f"Prompt: '{test_prompt}'")
 
-    if not isinstance(models_list, dict) or 'models' not in models_list:
-        print("ERROR: Ollama client.list() did not return expected dictionary with 'models' key.")
-        exit(1)
-
-    found_model = False
-    for model_info in models_list.get('models', []):
-        if not isinstance(model_info, dict) or 'name' not in model_info:
-            print(f"WARNING: Found a model entry without a 'name' key: {model_info}")
-            continue # Skip this malformed entry
-
-        if model_info['name'].startswith('llama3'): # Check for the model name you pulled
-            print(f"SUCCESS: Found model: {model_info['name']}")
-            found_model = True
-            break
-
-    if not found_model:
-        print("ERROR: The 'llama3' model was not found on the Ollama server. "
-              "Please ensure 'ollama pull llama3' ran successfully in the workflow, "
-              "and that the server has fully started.")
-        exit(1)
-
-    # --- Step 2: Perform a chat completion request ---
-    messages_for_chat = [
-        {'role': 'user', 'content': 'What is the capital of Japan?'},
-    ]
-
-    print("\n--- Sending a chat completion request to the 'llama3' model ---")
     response = client.chat(
-        model='llama3', # Specify the model to use for this request
-        messages=messages_for_chat,
+        model='llama3', # Ensure this model was pulled in the GitHub Action workflow
+        messages=[
+            {'role': 'user', 'content': test_prompt},
+        ],
     )
 
-    print("\nOllama Response (Capital of Japan):")
+    print("\nOllama Response to test prompt:")
     print(response['message']['content'].strip())
 
-    # --- Step 3: Demonstrate a streaming response (optional) ---
+    # --- Demonstrating a streaming response (optional, as in previous examples) ---
     print("\n--- Demonstrating a streaming chat completion response ---")
     stream_messages = [
         {'role': 'user', 'content': 'Tell me a very short, cheerful story about a cat.'},
@@ -59,20 +46,23 @@ try:
     stream_response = client.chat(
         model='llama3',
         messages=stream_messages,
-        stream=True
+        stream=True # Set stream=True to receive the response in chunks
     )
     print("Streaming story:")
     for chunk in stream_response:
-        print(chunk['message']['content'], end='', flush=True)
+        print(chunk['message']['content'], end='', flush=True) # flush=True ensures immediate output
     print("\n\n--- Streaming response complete ---")
+
 
 except ollama.ResponseError as e:
     print(f"\nERROR: Ollama API encountered an issue!")
     print(f"Details: {e.error} (HTTP Status Code: {e.status_code})")
     print("Possible reasons: Ollama server not fully started, model not pulled, or incorrect model name.")
+    print(f"OLLAMA_API_URL used: {ollama_api_url}")
     exit(1)
 except Exception as e:
     print(f"\nERROR: An unexpected error occurred during Ollama interaction: {e}")
     print("This might be due to the Ollama server not being fully ready, "
-          "or an issue with the response format. Check the raw `models_list` output above.")
+          "or an issue with the response format. Check the raw `models_response` output above.")
+    print(f"OLLAMA_API_URL used: {ollama_api_url}")
     exit(1)
