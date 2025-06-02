@@ -19,48 +19,40 @@ jobs:
 
     - name: Install Ollama
       run: |
-        # Download and install Ollama for Linux
         curl -fsSL https://ollama.com/install.sh | sh
 
     - name: Start Ollama server and pull model
       run: |
-        # Start the Ollama server in the background.
-        # The '&' sends it to the background so the workflow can continue.
         ollama serve &
 
-        # Wait for the Ollama server to fully start up.
-        # This is crucial to avoid "connection refused" errors in your Python script.
         echo "Waiting for Ollama server to be ready..."
         sleep 15 # Adjust this sleep duration if you face connection issues, especially for larger models
 
-        # Verify Ollama is running (optional, but good for debugging)
         curl http://localhost:11434 || { echo "Ollama server did not respond!"; exit 1; }
         echo "Ollama server is running."
 
-        # Pull a small, efficient model.
-        # Larger models might cause timeouts or run out of memory on GitHub-hosted runners.
-        ollama pull llama3 # You can try 'phi3:mini' or 'tinyllama' for even faster runs
+        ollama pull llama3
         echo "Model llama3 pulled."
+
+        # --- NEW: Run a test prompt directly here ---
+        echo "Running a test prompt with Ollama..."
+        ollama run llama3 "Why is the sky blue?" || { echo "Ollama test prompt failed!"; exit 1; }
+        echo "Ollama test prompt completed successfully."
+        # --- END NEW ---
       env:
-        # Important: Ollama needs to listen on 0.0.0.0 inside the container/VM
-        # for your script to connect via localhost.
         OLLAMA_HOST: "0.0.0.0"
-        # Keep the model loaded in memory for a short duration to speed up subsequent requests
         OLLAMA_KEEP_ALIVE: 5m
 
     - name: Set up Python environment
       uses: actions/setup-python@v5
       with:
-        python-version: '3.x' # Use the latest Python 3 version
+        python-version: '3.x'
 
     - name: Install Python dependencies
       run: |
-        # Install the official Ollama Python library
         pip install ollama
 
     - name: Run Python script to interact with Ollama
       run: python ollama_client.py
       env:
-        # Pass the Ollama API URL to your Python script via an environment variable.
-        # This is good practice, though 'http://localhost:11434' is the default.
         OLLAMA_API_URL: http://localhost:11434
